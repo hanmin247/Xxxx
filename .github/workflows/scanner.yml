@@ -1,0 +1,60 @@
+name: Ruijie Voucher Scanner CI
+
+on:
+  # Manual အနေနဲ့ GitHub Actions tab ကနေ တိုက်ရိုက် Run လို့ရအောင် လုပ်ပေးထားပါတယ်
+  workflow_dispatch:
+    inputs:
+      target_range:
+        description: 'Scan Range Option (1: 6-digit, 2: 7-digit, 4: Random)'
+        required: true
+        default: '1'
+        type: string
+
+  # လိုချင်ရင် အချိန်အလိုက် အလိုအလျောက် run ဖို့ သတ်မှတ်နိုင်ပါတယ် (ဥပမာ - နေ့တိုင်း မြန်မာစံတော်ချိန် ည ၁၂ နာရီ)
+  # schedule:
+  #   - cron: '0 17 * * *'
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repository ကို checkout လုပ်ရန်
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Python Setup လုပ်ရန်
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      # 3. လိုအပ်သော Dependencies များကို Install လုပ်ရန် (ddddocr, opencv, aiohttp စသည်ဖြင့်)
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests aiohttp opencv-python-headless ddddocr numpy
+
+      # 4. Scanner Script ကို စတင် Run ရန် (input ပေါ် မူတည်ပြီး run နိုင်ရန်)
+      - name: Run Scanner Script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # အကယ်၍ script ထဲက config ကို Github Secrets နဲ့ တွဲသုံးချင်ရင် ဒီနေရာကနေ pass လုပ်လို့ရပါတယ်
+          python3 scanner.py <<EOF
+          y
+          ${{ inputs.target_range || '1' }}
+          500
+          yes
+          EOF
+
+      # 5. တွေ့ရှိခဲ့သော voucher result ဖိုင်များကို artifact အနေနဲ့ သိမ်းဆည်းရန်
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: voucher-scan-results
+          path: |
+            found_voucher.txt
+            ~/scan_results.txt
